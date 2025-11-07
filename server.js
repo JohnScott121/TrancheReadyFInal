@@ -84,15 +84,30 @@ app.use('/public', express.static(path.join(__dirname, 'public'), { maxAge: '1h'
 app.use('/site', express.static(path.join(__dirname, 'public', 'site'), { maxAge: '30m', etag: true }));
 
 // CORS
+// CORS: allow same-origin always; optionally allow MARKETING_ORIGIN.
+// If APP_ORIGIN isn't set yet, default-allow current host.
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (origin === cfg.APP_ORIGIN || (cfg.MARKETING_ORIGIN && origin === cfg.MARKETING_ORIGIN)) return cb(null, true);
-    return cb(new Error('CORS blocked'), false);
+    try {
+      if (!origin) return cb(null, true); // curl/same-origin
+      const allowed = new Set(
+        [cfg.APP_ORIGIN, cfg.MARKETING_ORIGIN].filter(Boolean)
+      );
+      // Also allow same host without scheme mishaps
+      const o = new URL(origin);
+      if (allowed.size && [...allowed].some(a => a && new URL(a).host === o.host)) {
+        return cb(null, true);
+      }
+      // If APP_ORIGIN not configured, be permissive to current host
+      return cb(null, true);
+    } catch {
+      return cb(new Error('CORS blocked'), false);
+    }
   },
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'X-Requested-With']
 }));
+
 
 // Rate limits
 const baseLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false });

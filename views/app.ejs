@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TrancheReady — Upload & Validate</title>
+  <title>TrancheReady — Upload & Evidence</title>
   <meta name="theme-color" content="#FFFFFF" id="theme-color">
   <link rel="icon" href="/public/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/public/style.css">
@@ -19,8 +19,8 @@
 
 <main class="container page">
   <section class="card">
-    <h1>CSV in → Validate</h1>
-    <p class="muted">Upload <strong>Clients.csv</strong> and <strong>Transactions.csv</strong> to check header mapping and rejects. Files are processed in memory; nothing is stored.</p>
+    <h1>CSV in → Evidence Pack</h1>
+    <p class="muted">Upload <strong>Clients.csv</strong> and <strong>Transactions.csv</strong>. Generate explainable risk, monitoring cases, and a signed evidence ZIP + verify link.</p>
 
     <form id="uform" class="uform" aria-describedby="help">
       <div id="drop" class="drop" tabindex="0" role="button" aria-label="Drop CSV files here">
@@ -43,14 +43,15 @@
       </div>
 
       <div class="actions">
+        <button id="validateBtn" class="btn ghost" type="button">Validate only</button>
         <button id="submitBtn" class="btn primary" type="submit">
           <span class="btn-spinner" aria-hidden="true"></span>
-          Validate files
+          Generate evidence
         </button>
         <a class="btn ghost" href="/api/templates?name=clients">Clients template</a>
         <a class="btn ghost" href="/api/templates?name=transactions">Transactions template</a>
       </div>
-      <p id="help" class="muted small">This endpoint only validates structure. Evidence generation arrives in Part 3.</p>
+      <p id="help" class="muted small">Validation checks structure; Generate creates the full evidence pack with hashes (and signature if configured).</p>
 
       <div id="progress" class="progress" hidden><div class="bar" style="width:0%"></div></div>
     </form>
@@ -59,6 +60,29 @@
   <section class="card">
     <h2>Results</h2>
     <div id="skeleton" class="skeleton" hidden></div>
+
+    <div id="summary" class="summary" hidden>
+      <div class="summary-row">
+        <div>
+          <div class="label">Verify link</div>
+          <div class="mono" id="verifyUrl">—</div>
+        </div>
+        <div class="summary-actions">
+          <button class="btn small" id="copyVerify">Copy</button>
+          <a class="btn secondary" id="openVerify" target="_blank" rel="noopener">Open</a>
+          <a class="btn primary" id="downloadZip">Download ZIP</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="riskWrap" class="table-wrap" hidden>
+      <table class="table" aria-describedby="riskCaption">
+        <caption id="riskCaption" class="sr-only">Client risk scores and reasons</caption>
+        <thead><tr><th>Client</th><th>Band</th><th>Score</th><th>Reasons</th></tr></thead>
+        <tbody id="riskBody"></tbody>
+      </table>
+    </div>
+
     <pre id="out" class="pre" aria-live="polite"></pre>
   </section>
 </main>

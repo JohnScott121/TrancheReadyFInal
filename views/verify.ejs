@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verify Evidence — TrancheReady</title>
+  <link rel="icon" href="/public/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+<header class="glass-nav">
+  <div class="container nav-grid">
+    <a class="brand" href="/" aria-label="TrancheReady">
+      <img src="/public/logo.svg" alt="" class="brand-mark" width="28" height="32">
+      <span class="brand-name">TrancheReady</span>
+    </a>
+  </div>
+</header>
+
+<main class="container page">
+  <section class="card">
+    <h1>Evidence manifest</h1>
+    <p class="muted">SHA-256 hashes and optional Ed25519 signature for integrity verification.</p>
+
+    <div class="grid two">
+      <article class="panel">
+        <h3>Files</h3>
+        <ul class="file-list">
+          <% manifest.files.forEach(f => { %>
+            <li>
+              <span class="mono"><%= f.name %></span>
+              <small class="muted"><%= f.bytes %> bytes</small>
+              <code class="hash mono"><%= f.sha256 %></code>
+            </li>
+          <% }) %>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <h3>Metadata</h3>
+        <div class="kv">
+          <div><span class="k">Created (UTC)</span><span class="v mono"><%= manifest.created_utc %></span></div>
+          <div><span class="k">Ruleset</span><span class="v mono"><%= manifest.ruleset_id %></span></div>
+          <div><span class="k">Hash algo</span><span class="v mono"><%= manifest.hash_algo %></span></div>
+        </div>
+
+        <% if (manifest.signing && publicKey) { %>
+          <div class="sign-block">
+            <div class="badge good">Signature present</div>
+            <p class="muted small">Key: <span class="mono"><%= manifest.signing.key_id %></span></p>
+            <button class="btn secondary" id="verifyBtn">Verify signature</button>
+            <p id="verifyMsg" class="muted small"></p>
+          </div>
+        <% } else { %>
+          <div class="badge warn">No signature</div>
+        <% } %>
+      </article>
+    </div>
+
+    <details class="manifest-raw">
+      <summary>View raw manifest.json</summary>
+      <pre class="pre"><%= JSON.stringify(manifest, null, 2) %></pre>
+    </details>
+  </section>
+</main>
+
+<script>
+(async function(){
+  const btn = document.getElementById('verifyBtn');
+  if(!btn) return;
+  btn.addEventListener('click', async ()=>{
+    const msg = document.getElementById('verifyMsg');
+    msg.textContent = 'Verifying…';
+    try{
+      const m = <%- JSON.stringify(manifest) %>;
+      const pub = '<%= publicKey %>';
+      const enc = new TextEncoder();
+      const message = enc.encode(JSON.stringify({ files: m.files, created_utc: m.created_utc, ruleset_id: m.ruleset_id }));
+      const sig = Uint8Array.from(atob(m.signing.signature), c=>c.charCodeAt(0));
+      const key = Uint8Array.from(atob(pub), c=>c.charCodeAt(0));
+      const ok = await crypto.subtle.verify(
+        { name: 'Ed25519' },
+        await crypto.subtle.importKey('raw', key, {name:'Ed25519'}, false, ['verify']),
+        sig,
+        message
+      );
+      msg.textContent = ok ? '✔ Signature valid' : '✖ Signature invalid';
+    }catch(e){ msg.textContent = 'Verification failed: ' + e.message; }
+  });
+})();
+</script>
+</body>
+</html>

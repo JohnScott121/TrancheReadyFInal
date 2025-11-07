@@ -1,3 +1,4 @@
+// public/app.js
 const form = document.getElementById('uform');
 const clientsInput = document.getElementById('clientsInput');
 const txInput = document.getElementById('txInput');
@@ -21,7 +22,6 @@ function toast(msg, ms=2200){
   requestAnimationFrame(()=> toastEl.classList.add('show'));
   setTimeout(()=> { toastEl.classList.remove('show'); setTimeout(()=>toastEl.hidden=true, 180); }, ms);
 }
-
 function esc(s){ return (s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 if (drop){
@@ -61,9 +61,9 @@ async function run(url, isGenerate=false){
 
     setBar(40);
     const res = await fetch(url, { method:'POST', body: fd, headers: { 'X-Requested-With': 'fetch' } });
-    const text = await res.text(); // get raw to diagnose
+    const text = await res.text();
     let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { /* leave as {} for error display */ }
+    try { data = text ? JSON.parse(text) : {}; } catch {}
 
     setBar(80);
     if (!res.ok) {

@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: TrancheReady App API
+  version: 0.4.0
+  description: |
+    CSV in → Evidence ZIP out. Explainable risk, monitoring cases, signed manifest, verify link.
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses: { "200": { description: OK } }
+
+  /api/status:
+    get:
+      summary: Readiness + feature flags
+      responses:
+        "200":
+          description: OK
+
+  /api/version:
+    get:
+      summary: App & ruleset version
+      responses: { "200": { description: OK } }
+
+  /api/templates:
+    get:
+      summary: Download CSV templates
+      parameters:
+        - in: query
+          name: name
+          schema: { type: string, enum: [clients, transactions] }
+          required: true
+      responses:
+        "200": { description: CSV template }
+
+  /api/validate:
+    post:
+      summary: Validate CSVs (structure, header mapping, rejects)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                clients: { type: string, format: binary }
+                transactions: { type: string, format: binary }
+      responses:
+        "200": { description: Validation JSON }
+
+  /upload:
+    post:
+      summary: Generate evidence (risk, cases, manifest) and return verify/download links
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                clients: { type: string, format: binary }
+                transactions: { type: string, format: binary }
+      responses:
+        "200": { description: Evidence links + risk array }
+
+  /verify/{token}:
+    get:
+      summary: Read-only manifest view (HTML)
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      responses: { "200": { description: HTML } }
+
+  /download/{token}:
+    get:
+      summary: Download the evidence ZIP
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      responses: { "200": { description: ZIP } }
+
+  /api/create-checkout-session:
+    post:
+      summary: Create Stripe Checkout session (Starter one-off or Team subscription)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plan:
+                  type: string
+                  enum: [starter, team]
+      responses:
+        "200":
+          description: Session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+
+components: {}

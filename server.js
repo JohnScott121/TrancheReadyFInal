@@ -20,23 +20,37 @@ import { buildCases } from './lib/cases.js';
 import { buildManifest } from './lib/manifest.js';
 import { zipNamedBuffers } from './lib/zip.js';
 import { verifyStore, newToken } from './lib/verify-store.js';
+import { reqIdFromHeaders } from './lib/request-id.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// ---------- App ----------
+const app = express();
+if (cfg.TRUST_PROXY) app.set('trust proxy', true);
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
 // ---------- Logger ----------
 const logger = pino({ level: cfg.LOG_LEVEL });
 const httpLogger = pinoHttp({
   logger,
-  customLogLevel: (_req, res, err) =>
-    err ? 'error' : res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info',
-  redact: { paths: ['req.headers.authorization', 'req.headers.cookie'], censor: '[redacted]' }
+  genReqId: (req, res) => {
+    const id = reqIdFromHeaders(req);
+    res.setHeader('x-request-id', id);
+    return id;
+  },
+  customLogLevel: (req, res, err) => {
+    // sample successful request logs
+    if (!err && res.statusCode < 400 && Math.random() > cfg.REQUEST_LOG_SAMPLE) return 'silent';
+    return err ? 'error' : res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+  },
+  customSuccessMessage: (req, res) => `${req.method} ${req.url} ${res.statusCode}`,
+  redact: {
+    paths: ['req.headers.authorization', 'req.headers.cookie'],
+    censor: '[redacted]'
+  }
 });
-
-// ---------- App ----------
-const app = express();
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
 
 // ---------- Middleware ----------
 app.use(httpLogger);
@@ -49,19 +63,27 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       "default-src": ["'self'"],
-      "script-src": ["'self'"],          // all scripts served from /public
+      "script-src": ["'self'"], // all site scripts are local
       "style-src": ["'self'", "'unsafe-inline'"],
       "img-src": ["'self'", "data:"],
       "connect-src": ["'self'"],
+      "frame-src": [],          // block iframes
       "object-src": ["'none'"],
+      "base-uri": ["'self'"],
+      "form-action": ["'self'"],
       "frame-ancestors": ["'none'"]
     }
   },
-  crossOriginResourcePolicy: { policy: "same-origin" }
+  crossOriginResourcePolicy: { policy: "same-origin" },
+  referrerPolicy: { policy: "no-referrer" },
+  xssFilter: true
 }));
 
+// Static assets (marketing + app)
 app.use('/public', express.static(path.join(__dirname, 'public'), { maxAge: '1h', etag: true }));
+app.use('/site', express.static(path.join(__dirname, 'public', 'site'), { maxAge: '30m', etag: true }));
 
+// CORS
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
@@ -69,13 +91,14 @@ app.use(cors({
     return cb(new Error('CORS blocked'), false);
   },
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type', 'X-Requested-With']
 }));
 
-const baseLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
-const heavyLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 60 });
-app.use(baseLimiter);
+// Rate limits
+const baseLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false });
+const heavyLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
 
+// Uploads (memory only)
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 2 }});
 
 // ---------- Health & diagnostics ----------
@@ -84,15 +107,13 @@ app.get('/api/status', (_req, res) => res.json({
   ok: true,
   time: new Date().toISOString(),
   origin: cfg.APP_ORIGIN,
-  tokens: verifyStore.map?.size || 0,
   ruleset_id: 'dnfbp-2025.11',
+  tokens_active: verifyStore.map?.size || 0,
   features: {
     stripe: Boolean(cfg.STRIPE_SECRET_KEY && (cfg.STRIPE_PRICE_ID_STARTER || cfg.STRIPE_PRICE_ID_TEAM)),
     signing: Boolean(cfg.SIGN_PUBLIC_KEY && cfg.SIGN_PRIVATE_KEY)
   }
 }));
-
-// Simple human-readable status page
 app.get('/status', (_req, res) => res.render('status', {
   env: {
     app_origin: cfg.APP_ORIGIN,
@@ -102,8 +123,7 @@ app.get('/status', (_req, res) => res.render('status', {
     verify_ttl_min: cfg.VERIFY_TTL_MIN
   }
 }));
-
-app.get('/api/version', (_req, res) => res.json({ name: 'trancheready', version: '0.4.0', ruleset_id: 'dnfbp-2025.11' }));
+app.get('/api/version', (_req, res) => res.json({ name: 'trancheready', version: '1.0.0', ruleset_id: 'dnfbp-2025.11' }));
 
 // ---------- Swagger UI (/docs) ----------
 const openapiPath = path.join(__dirname, 'docs', 'openapi.yaml');
@@ -237,7 +257,12 @@ app.post('/api/create-checkout-session', async (req, res) => {
   }
 });
 
-// ---------- UI roots ----------
+// ---------- Marketing routes (nice URLs) ----------
+app.get('/pricing', (_req, res) => res.redirect(302, '/public/pricing.html'));
+app.get('/features', (_req, res) => res.redirect(302, '/site/features.html'));
+app.get('/faq', (_req, res) => res.redirect(302, '/site/faq.html'));
+
+// App root
 app.get('/', (_req, res) => res.render('app'));
 
 // 404 + errors

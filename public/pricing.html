@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pricing — TrancheReady</title>
+  <link rel="icon" href="/public/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+<header class="glass-nav">
+  <div class="container nav-grid">
+    <a class="brand" href="/" aria-label="TrancheReady">
+      <img src="/public/logo.svg" class="brand-mark" alt="" width="28" height="32">
+      <span class="brand-name">TrancheReady</span>
+    </a>
+  </div>
+</header>
+
+<main class="container page">
+  <section class="card">
+    <h1>Pricing</h1>
+    <p class="muted">Pay for a pack when you need it, or subscribe for teams.</p>
+
+    <div class="grid two">
+      <article class="panel">
+        <h3>Starter</h3>
+        <p>One evidence run (one-off payment).</p>
+        <button class="btn primary" data-plan="starter">Get Starter</button>
+      </article>
+
+      <article class="panel">
+        <h3>Team</h3>
+        <p>Unlimited runs (subscription).</p>
+        <button class="btn secondary" data-plan="team">Get Team</button>
+      </article>
+    </div>
+
+    <p id="msg" class="muted small" style="margin-top:12px;"></p>
+  </section>
+</main>
+
+<script src="/public/pricing.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: trancheready-app
+    env: node
+    plan: starter
+    region: singapore
+    buildCommand: ""
+    startCommand: "npm start"
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: APP_ORIGIN
+        value: https://app.trancheready.com

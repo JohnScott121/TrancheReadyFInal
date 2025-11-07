@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Status — TrancheReady</title>
+  <link rel="icon" href="/public/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+<header class="glass-nav">
+  <div class="container nav-grid">
+    <a class="brand" href="/" aria-label="TrancheReady">
+      <img src="/public/logo.svg" class="brand-mark" alt="" width="28" height="32">
+      <span class="brand-name">TrancheReady</span>
+    </a>
+  </div>
+</header>
+<main class="container page">
+  <section class="card">
+    <h1>Service status</h1>
+    <div class="kv">
+      <div><span class="k">App origin</span> <span class="v mono"><%= env.app_origin %></span></div>
+      <div><span class="k">Marketing origin</span> <span class="v mono"><%= env.marketing_origin %></span></div>
+      <div><span class="k">Verify TTL (min)</span> <span class="v mono"><%= env.verify_ttl_min %></span></div>
+      <div><span class="k">Signing enabled</span> <span class="v mono"><%= env.signing %></span></div>
+      <div><span class="k">Stripe enabled</span> <span class="v mono"><%= env.stripe %></span></div>
+    </div>
+    <p class="muted small">For machine-readable info, see <code>/api/status</code>.</p>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrancheReady — Upload & Validate</title>
+  <meta name="theme-color" content="#FFFFFF" id="theme-color">
+  <link rel="icon" href="/public/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+<header class="glass-nav">
+  <div class="container nav-grid">
+    <a class="brand" href="/" aria-label="TrancheReady">
+      <img src="/public/logo.svg" class="brand-mark" alt="" width="28" height="32">
+      <span class="brand-name">TrancheReady</span>
+    </a>
+  </div>
+</header>
+
+<main class="container page">
+  <section class="card">
+    <h1>CSV in → Validate</h1>
+    <p class="muted">Upload <strong>Clients.csv</strong> and <strong>Transactions.csv</strong> to check header mapping and rejects. Files are processed in memory; nothing is stored.</p>
+
+    <form id="uform" class="uform" aria-describedby="help">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Drop CSV files here">
+        <div class="drop-inner">
+          <svg viewBox="0 0 24 24" class="i-xl"><path d="M12 16v-8m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <div>Drop <strong>Clients.csv</strong> & <strong>Transactions.csv</strong></div>
+          <small class="muted">…or select below</small>
+        </div>
+      </div>
+
+      <div class="inputs">
+        <label class="file-row">
+          <span>Clients.csv</span>
+          <input id="clientsInput" required type="file" name="clients" accept=".csv" />
+        </label>
+        <label class="file-row">
+          <span>Transactions.csv</span>
+          <input id="txInput" required type="file" name="transactions" accept=".csv" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="submitBtn" class="btn primary" type="submit">
+          <span class="btn-spinner" aria-hidden="true"></span>
+          Validate files
+        </button>
+        <a class="btn ghost" href="/api/templates?name=clients">Clients template</a>
+        <a class="btn ghost" href="/api/templates?name=transactions">Transactions template</a>
+      </div>
+      <p id="help" class="muted small">This endpoint only validates structure. Evidence generation arrives in Part 3.</p>
+
+      <div id="progress" class="progress" hidden><div class="bar" style="width:0%"></div></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Results</h2>
+    <div id="skeleton" class="skeleton" hidden></div>
+    <pre id="out" class="pre" aria-live="polite"></pre>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="/public/app.js" defer></script>
+</body>
+</html>

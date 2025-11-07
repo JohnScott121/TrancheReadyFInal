@@ -7,7 +7,12 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
+import multer from 'multer';
+import fs from 'fs';
+import { parse as csvParse } from 'csv-parse/sync';
+
 import { cfg } from './lib/config.js';
+import { normalizeClients, normalizeTransactions } from './lib/csv-normalize.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,14 +37,13 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(compression());
 
-// Helmet + CSP (tight by default—adjust later if you add external assets)
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
       "default-src": ["'self'"],
       "script-src": ["'self'"],
-      "style-src": ["'self'", "'unsafe-inline'"], // allow our inline focus styles
+      "style-src": ["'self'", "'unsafe-inline'"],
       "img-src": ["'self'", "data:"],
       "connect-src": ["'self'"],
       "object-src": ["'none'"],
@@ -49,13 +53,11 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-origin" }
 }));
 
-// Static assets
 app.use('/public', express.static(path.join(__dirname, 'public'), { maxAge: '1h', etag: true }));
 
-// CORS: allow same-origin and (optionally) one marketing origin
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // curl or same-origin
+    if (!origin) return cb(null, true);
     if (origin === cfg.APP_ORIGIN || (cfg.MARKETING_ORIGIN && origin === cfg.MARKETING_ORIGIN)) return cb(null, true);
     return cb(new Error('CORS blocked'), false);
   },
@@ -63,9 +65,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type']
 }));
 
-// Rate limits
 const baseLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
+const heavyLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 60 });
 app.use(baseLimiter);
+
+// Memory uploads (no temp files)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 2 }
+});
 
 // ---------- Health & diagnostics ----------
 app.get('/healthz', (_req, res) => res.send('ok'));
@@ -73,11 +81,49 @@ app.get('/api/status', (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString(), origin: cfg.APP_ORIGIN });
 });
 app.get('/api/version', (_req, res) => {
-  res.json({ name: 'trancheready', version: '0.1.0' });
+  res.json({ name: 'trancheready', version: '0.2.0' });
 });
 
-// ---------- App placeholder (will be replaced in Part 3) ----------
-app.get('/', (_req, res) => res.render('index', { appOrigin: cfg.APP_ORIGIN }));
+// ---------- Templates ----------
+app.get('/api/templates', (req, res) => {
+  const name = (req.query.name || '').toString().toLowerCase();
+  const file = name === 'transactions' ? 'Transactions.template.csv' : 'Clients.template.csv';
+  const full = path.join(__dirname, 'public', 'templates', file);
+  if (!fs.existsSync(full)) return res.status(404).json({ error: 'Template not found' });
+  res.setHeader('Content-Type','text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${file}"`);
+  fs.createReadStream(full).pipe(res);
+});
+
+// ---------- Validate (CSV → normalized view) ----------
+app.post('/api/validate', heavyLimiter, upload.fields([{ name: 'clients', maxCount: 1 }, { name: 'transactions', maxCount: 1 }]), (req, res) => {
+  try {
+    const clientsFile = req.files?.clients?.[0];
+    const txFile = req.files?.transactions?.[0];
+    if (!clientsFile || !txFile) return res.status(400).json({ ok:false, error: 'Both files required: clients, transactions' });
+
+    const clientsCsv = csvParse(clientsFile.buffer.toString('utf8'), { columns: true, skip_empty_lines: true });
+    const txCsv = csvParse(txFile.buffer.toString('utf8'), { columns: true, skip_empty_lines: true });
+
+    const { clients, clientHeaderMap } = normalizeClients(clientsCsv);
+    const { txs, txHeaderMap, rejects, lookback } = normalizeTransactions(txCsv);
+
+    res.json({
+      ok: true,
+      counts: { clients: clients.length, txs: txs.length, rejects: rejects.length },
+      clientHeaderMap,
+      txHeaderMap,
+      rejects,
+      lookback
+    });
+  } catch (err) {
+    req.log?.error?.(err, 'validate_failed');
+    res.status(500).json({ ok:false, error: 'Validation failed' });
+  }
+});
+
+// ---------- UI (upload/validate) ----------
+app.get('/', (_req, res) => res.render('app'));
 
 // 404
 app.use((_req, res) => res.status(404).send('Not Found'));

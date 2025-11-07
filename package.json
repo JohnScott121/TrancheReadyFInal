@@ -1,14 +1,17 @@
 {
   "name": "trancheready",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=18 <=22" },
   "scripts": {
     "start": "node server.js",
     "start:prod": "NODE_ENV=production node server.js",
-    "health": "node -e \"require('http').get('http://localhost:'+(process.env.PORT||10000)+'/healthz',r=>r.pipe(process.stdout))\"",
-    "lint": "node -e \"console.log('Add ESLint in Part 5 CI')\""
+    "lint": "node --run eslint",
+    "eslint": "eslint .",
+    "format": "prettier -w .",
+    "check:audit": "npm audit --audit-level=moderate || true",
+    "health": "node -e \"require('http').get('http://localhost:'+(process.env.PORT||10000)+'/healthz',r=>r.pipe(process.stdout))\""
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -27,5 +30,10 @@
     "swagger-ui-express": "^5.0.1",
     "tweetnacl": "^1.0.3",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "eslint": "^9.12.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.3.3"
   }
 }

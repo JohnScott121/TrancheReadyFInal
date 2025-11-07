@@ -9,8 +9,9 @@ import pino from 'pino';
 import pinoHttp from 'pino-http';
 import multer from 'multer';
 import fs from 'fs';
-import crypto from 'crypto';
 import { parse as csvParse } from 'csv-parse/sync';
+import Stripe from 'stripe';
+import swaggerUi from 'swagger-ui-express';
 
 import { cfg } from './lib/config.js';
 import { normalizeClients, normalizeTransactions } from './lib/csv-normalize.js';
@@ -48,7 +49,7 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       "default-src": ["'self'"],
-      "script-src": ["'self'"],
+      "script-src": ["'self'"],          // all scripts served from /public
       "style-src": ["'self'", "'unsafe-inline'"],
       "img-src": ["'self'", "data:"],
       "connect-src": ["'self'"],
@@ -79,8 +80,38 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 
 // ---------- Health & diagnostics ----------
 app.get('/healthz', (_req, res) => res.send('ok'));
-app.get('/api/status', (_req, res) => res.json({ ok: true, time: new Date().toISOString(), origin: cfg.APP_ORIGIN, tokens: verifyStore.map?.size || 0 }));
-app.get('/api/version', (_req, res) => res.json({ name: 'trancheready', version: '0.3.0', ruleset_id: 'dnfbp-2025.11' }));
+app.get('/api/status', (_req, res) => res.json({
+  ok: true,
+  time: new Date().toISOString(),
+  origin: cfg.APP_ORIGIN,
+  tokens: verifyStore.map?.size || 0,
+  ruleset_id: 'dnfbp-2025.11',
+  features: {
+    stripe: Boolean(cfg.STRIPE_SECRET_KEY && (cfg.STRIPE_PRICE_ID_STARTER || cfg.STRIPE_PRICE_ID_TEAM)),
+    signing: Boolean(cfg.SIGN_PUBLIC_KEY && cfg.SIGN_PRIVATE_KEY)
+  }
+}));
+
+// Simple human-readable status page
+app.get('/status', (_req, res) => res.render('status', {
+  env: {
+    app_origin: cfg.APP_ORIGIN,
+    marketing_origin: cfg.MARKETING_ORIGIN || '(not set)',
+    stripe: Boolean(cfg.STRIPE_SECRET_KEY && (cfg.STRIPE_PRICE_ID_STARTER || cfg.STRIPE_PRICE_ID_TEAM)),
+    signing: Boolean(cfg.SIGN_PUBLIC_KEY && cfg.SIGN_PRIVATE_KEY),
+    verify_ttl_min: cfg.VERIFY_TTL_MIN
+  }
+}));
+
+app.get('/api/version', (_req, res) => res.json({ name: 'trancheready', version: '0.4.0', ruleset_id: 'dnfbp-2025.11' }));
+
+// ---------- Swagger UI (/docs) ----------
+const openapiPath = path.join(__dirname, 'docs', 'openapi.yaml');
+if (fs.existsSync(openapiPath)) {
+  const yamlServePath = '/docs/openapi.yaml';
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(undefined, { swaggerOptions: { url: yamlServePath }, customSiteTitle: 'TrancheReady API Docs' }));
+  app.get(yamlServePath, (_req, res) => res.type('text/yaml').send(fs.readFileSync(openapiPath,'utf8')));
+}
 
 // ---------- Templates ----------
 app.get('/api/templates', (req, res) => {
@@ -113,7 +144,7 @@ app.post('/api/validate', heavyLimiter, upload.fields([{ name: 'clients', maxCou
   }
 });
 
-// ---------- Upload → Evidence (ZIP + verify) ----------
+// ---------- Upload → Evidence ----------
 app.post('/upload', heavyLimiter, upload.fields([{ name: 'clients', maxCount: 1 }, { name: 'transactions', maxCount: 1 }]), async (req, res) => {
   try {
     const clientsFile = req.files?.clients?.[0];
@@ -129,7 +160,6 @@ app.post('/upload', heavyLimiter, upload.fields([{ name: 'clients', maxCount: 1 
     const { scores, rulesMeta } = await scoreAll(clients, txs, lookback);
     const cases = buildCases(txs, lookback);
 
-    // Evidence files
     const files = {
       'clients.json': Buffer.from(JSON.stringify(clients, null, 2)),
       'transactions.json': Buffer.from(JSON.stringify(txs, null, 2)),
@@ -177,7 +207,6 @@ app.get('/verify/:token', (req, res) => {
   if (!entry) return res.status(404).send('Link expired or not found.');
   res.render('verify', { manifest: entry.manifest, publicKey: cfg.SIGN_PUBLIC_KEY });
 });
-
 app.get('/download/:token', (req, res) => {
   const entry = verifyStore.get(req.params.token);
   if (!entry) return res.status(404).send('Link expired or not found.');
@@ -186,7 +215,29 @@ app.get('/download/:token', (req, res) => {
   res.send(entry.zipBuffer);
 });
 
-// ---------- UI ----------
+// ---------- Stripe Checkout ----------
+app.post('/api/create-checkout-session', async (req, res) => {
+  try {
+    if (!cfg.STRIPE_SECRET_KEY) return res.status(400).json({ error: 'Stripe not configured.' });
+    const stripe = new Stripe(cfg.STRIPE_SECRET_KEY);
+    const plan = (req.body?.plan || '').toLowerCase();
+    const priceId = plan === 'team' ? cfg.STRIPE_PRICE_ID_TEAM : cfg.STRIPE_PRICE_ID_STARTER;
+    if (!priceId) return res.status(400).json({ error: 'Missing price id for plan.' });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: plan === 'team' ? 'subscription' : 'payment',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: new URL('/public/pricing.html?success=1', cfg.APP_ORIGIN).toString(),
+      cancel_url: new URL('/public/pricing.html?canceled=1', cfg.APP_ORIGIN).toString()
+    });
+    res.json({ url: session.url });
+  } catch (e) {
+    req.log?.error?.(e, 'stripe_error');
+    res.status(500).json({ error: 'Stripe error' });
+  }
+});
+
+// ---------- UI roots ----------
 app.get('/', (_req, res) => res.render('app'));
 
 // 404 + errors

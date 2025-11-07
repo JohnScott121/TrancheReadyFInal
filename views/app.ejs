@@ -2,27 +2,50 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TrancheReady — Upload & Evidence</title>
-  <meta name="theme-color" content="#FFFFFF" id="theme-color">
+  <title>TrancheReady — Generate Evidence</title>
+  <meta name="theme-color" content="#0D1321">
   <link rel="icon" href="/public/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/public/style.css">
 </head>
-<body>
+<body class="theme-auto">
 <header class="glass-nav">
   <div class="container nav-grid">
-    <a class="brand" href="/" aria-label="TrancheReady">
+    <a class="brand" href="/site/index.html" aria-label="TrancheReady">
       <img src="/public/logo.svg" class="brand-mark" alt="" width="28" height="32">
       <span class="brand-name">TrancheReady</span>
     </a>
+    <nav class="nav-links">
+      <a class="link-muted" href="/site/features.html">Features</a>
+      <a class="link-muted" href="/site/faq.html">FAQ</a>
+      <a class="link-muted" href="/pricing">Pricing</a>
+    </nav>
+    <div class="nav-actions">
+      <button id="themeToggle" class="btn ghost small" type="button">Theme</button>
+    </div>
   </div>
 </header>
 
 <main class="container page">
-  <section class="card">
-    <h1>CSV in → Evidence Pack</h1>
-    <p class="muted">Upload <strong>Clients.csv</strong> and <strong>Transactions.csv</strong>. Generate explainable risk, monitoring cases, and a signed evidence ZIP + verify link.</p>
+  <section class="card hero-app">
+    <div class="hero-copy">
+      <h1>CSV in → Signed ZIP out</h1>
+      <p class="lead">Explainable risk scores, monitoring cases, and a signed evidence pack. No credentials.</p>
+      <div class="actions">
+        <a class="btn primary" href="#uploader">Start</a>
+        <a class="btn ghost" href="/api/templates?name=clients">Clients template</a>
+        <a class="btn ghost" href="/api/templates?name=transactions">Transactions template</a>
+      </div>
+    </div>
+    <div class="hero-ill">
+      <div class="shield"></div>
+    </div>
+  </section>
 
-    <form id="uform" class="uform" aria-describedby="help">
+  <section id="uploader" class="card">
+    <h2>Upload files</h2>
+    <p class="muted">Select your <strong>Clients.csv</strong> and <strong>Transactions.csv</strong>. Files are processed in memory only.</p>
+
+    <form id="uform" class="uform">
       <div id="drop" class="drop" tabindex="0" role="button" aria-label="Drop CSV files here">
         <div class="drop-inner">
           <svg viewBox="0 0 24 24" class="i-xl"><path d="M12 16v-8m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -43,15 +66,12 @@
       </div>
 
       <div class="actions">
-        <button id="validateBtn" class="btn ghost" type="button">Validate only</button>
+        <button id="validateBtn" class="btn secondary" type="button">Validate only</button>
         <button id="submitBtn" class="btn primary" type="submit">
           <span class="btn-spinner" aria-hidden="true"></span>
           Generate evidence
         </button>
-        <a class="btn ghost" href="/api/templates?name=clients">Clients template</a>
-        <a class="btn ghost" href="/api/templates?name=transactions">Transactions template</a>
       </div>
-      <p id="help" class="muted small">Validation checks structure; Generate creates the full evidence pack with hashes (and signature if configured).</p>
 
       <div id="progress" class="progress" hidden><div class="bar" style="width:0%"></div></div>
     </form>
@@ -59,7 +79,6 @@
 
   <section class="card">
     <h2>Results</h2>
-    <div id="skeleton" class="skeleton" hidden></div>
 
     <div id="summary" class="summary" hidden>
       <div class="summary-row">
@@ -90,5 +109,17 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="/public/app.js" defer></script>
+<script>
+  // Simple theme toggle (persists)
+  const tBtn = document.getElementById('themeToggle');
+  const root = document.documentElement;
+  const saved = localStorage.getItem('tr_theme');
+  if (saved) root.setAttribute('data-theme', saved);
+  tBtn?.addEventListener('click', ()=>{
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('tr_theme', next);
+  });
+</script>
 </body>
 </html>

@@ -1,0 +1,23 @@
+{
+  "name": "trancheready",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18 <=22" },
+  "scripts": {
+    "start": "node server.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "health": "node -e \"require('http').get('http://localhost:'+(process.env.PORT||10000)+'/healthz',r=>r.pipe(process.stdout))\"",
+    "lint": "node -e \"console.log('Add ESLint in Part 5 CI')\""
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "pino": "^9.4.0",
+    "pino-http": "^10.3.0"
+  }
+}
